@@ -13,17 +13,18 @@ from collections import defaultdict
 DATA_PATH = pkg_resources.resource_filename("lcge", "data/")
 
 
+# 生成数据集
 def prepare_dataset(path, name):
     """
     Given a path to a folder containing tab separated files :
      train, test, valid
     In the format :
     (lhs)\t(rel)\t(rhs)\t(timestamp)\n
-    Maps each entity and relation to a unique id, create corresponding folder
-    name in pkg/data, with mapped train/test/valid files.
-    Also create to_skip_lhs / to_skip_rhs for filtered metrics and
-    rel_id / ent_id for analysis.
+    Maps each entity and relation to a unique id, create corresponding folder name in pkg/data, with mapped train/test/valid files.
+    Also create to_skip_lhs / to_skip_rhs for filtered metrics and rel_id / ent_id for analysis.
     """
+
+    # 从文件中读取实体、关系、时间戳，并将其映射到集合中
     files = ["train", "valid", "test"]
     entities, relations, timestamps = set(), set(), set()
     for f in files:
@@ -37,6 +38,7 @@ def prepare_dataset(path, name):
             timestamps.add(timestamp)
         to_read.close()
 
+    # 将实体、关系、时间戳在集合中排序，并映射到id
     entities_to_id = {x: i for (i, x) in enumerate(sorted(entities))}
     relations_to_id = {x: i for (i, x) in enumerate(sorted(relations))}
     timestamps_to_id = {x: i for (i, x) in enumerate(sorted(timestamps))}
@@ -120,6 +122,7 @@ def prepare_dataset(path, name):
     out.close()
 
 
+#  ICEW 数据集的处理
 if __name__ == "__main__":
     datasets = ["ICEWS14", "ICEWS05-15"]
     for d in datasets:
