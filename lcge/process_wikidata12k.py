@@ -14,6 +14,7 @@ import numpy as np
 DATA_PATH = pkg_resources.resource_filename("lcge", "data/")
 
 
+# 处理时间，提取年份转换为整数，并将####转换为-inf和inf
 def get_be(begin, end):
     begin = begin.strip().split("-")[0]
     end = end.strip().split("-")[0]
@@ -40,6 +41,7 @@ def prepare_dataset_rels(path, name):
     Also create to_skip_lhs / to_skip_rhs for filtered metrics and
     rel_id / ent_id for analysis.
     """
+    # 从 src_data 中读取实体、关系、时间戳，并将其映射到集合中
     files = ["train", "valid", "test"]
     entities, relations, timestamps = set(), set(), set()
     for f in files:
@@ -59,15 +61,13 @@ def prepare_dataset_rels(path, name):
 
         to_read.close()
 
-    print(f"{len(timestamps)} timestamps")
-
+    # 将实体、关系、时间戳在集合中排序，并映射到id，key为实体、关系、时间戳，value为id
     entities_to_id = {x: i for (i, x) in enumerate(sorted(entities))}
     relations_to_id = {x: i for (i, x) in enumerate(sorted(relations))}
 
-    # we need to sort timestamps and associate them to actual dates
+    # 对时间戳进行排序，并去掉-inf和inf
     all_ts = sorted(timestamps)[1:-1]
     timestamps_to_id = {x: i for (i, x) in enumerate(all_ts)}
-    # print(timestamps_to_id)
 
     print(
         "{} entities, {} relations over {} timestamps".format(
@@ -77,6 +77,7 @@ def prepare_dataset_rels(path, name):
     n_relations = len(relations)
     n_entities = len(entities)
 
+    # 创建 lcge 包中的文件夹
     try:
         os.makedirs(os.path.join(DATA_PATH, name))
     except OSError as e:
@@ -84,7 +85,7 @@ def prepare_dataset_rels(path, name):
         if r != "y":
             sys.exit()
 
-    # write ent to id / rel to id
+    # 把实体、关系、时间戳映射到id的字典写入文件，文件名分别为ent_id, rel_id, ts_id
     for dic, f in zip(
         [entities_to_id, relations_to_id, timestamps_to_id],
         ["ent_id", "rel_id", "ts_id"],
@@ -93,19 +94,16 @@ def prepare_dataset_rels(path, name):
         pickle.dump(dic, ff)
         ff.close()
 
-    # dump the time differences between timestamps for continuity regularizer
-    # ignores number of days in a month but who cares
-    # ts_to_int = [x[0] * 365 + x[1] * 30 + x[2] for x in all_ts]
-    ts_to_int = [x[0] for x in all_ts]
+    # 计算时间戳之间的差异，并将这些差异数据存储到文件中
+    ts_to_int = [x[0] for x in all_ts]  # 只取出年份
     ts = np.array(ts_to_int, dtype="float")
-    diffs = (
-        ts[1:] - ts[:-1]
-    )  # remove last timestamp from time diffs. it's not really a timestamp
+    # 提取时间戳之间的差值
+    diffs = ts[1:] - ts[:-1]
     out = open(os.path.join(DATA_PATH, name, "ts_diffs.pickle"), "wb")
     pickle.dump(diffs, out)
     out.close()
 
-    # map train/test/valid with the ids
+    # 用 id 替换实体、关系、时间戳，并序列化到 lcge 包中
     event_list = {
         "all": [],
     }
@@ -127,21 +125,22 @@ def prepare_dataset_rels(path, name):
             begin = begin_t
             end = end_t
 
-            if begin_t[0] == -math.inf:
+            if begin_t[0] == -math.inf:  # 处理 -inf，将其映射到第一个时间戳
                 begin = all_ts[0]
-                if not end_t[0] == math.inf:
+                if not end_t[0] == math.inf:  # 半时间区+1
                     half_intervals += 1
-            if end_t[0] == math.inf:
+            if end_t[0] == math.inf:  # 处理 inf，将其映射到最后一个时间戳
                 end = all_ts[-1]
-                if not begin_t[0] == -math.inf:
+                if not begin_t[0] == -math.inf:  # 半时间区+1
                     half_intervals += 1
 
-            if begin_t[0] > -math.inf and end_t[0] < math.inf:
+            if begin_t[0] > -math.inf and end_t[0] < math.inf:  # 处理完整时间戳
                 if begin_t[0] == end_t[0]:
                     point += 1
                 else:
-                    full_intervals += 1
+                    full_intervals += 1  # 完整时间区+1
 
+            # 将时间戳映射到id
             begin = timestamps_to_id[begin]
             end = timestamps_to_id[end]
 
@@ -153,9 +152,11 @@ def prepare_dataset_rels(path, name):
             rel = relations_to_id[rel]
             rhs = entities_to_id[rhs]
 
+            # 添加事件到 event_list 中，event_list 是总的事件列表
             event_list["all"].append((begin, -1, (lhs, rel, rhs)))
             event_list["all"].append((end, +1, (lhs, rel, rhs)))
 
+            # 添加到 examples 中
             try:
                 examples.append([lhs, rel, rhs, begin, end])
             except ValueError:
@@ -168,6 +169,7 @@ def prepare_dataset_rels(path, name):
             f"Total : {total} // Full : {full_intervals} // Half : {half_intervals} // Point : {point}"
         )
 
+    # 将 event_list 中的事件序列化到文件中，包含所有事件、开始事件、结束事件
     for k, v in event_list.items():
         out = open(Path(DATA_PATH) / name / ("event_list_" + k + ".pickle"), "wb")
         print("Dumping all events", len(v))

@@ -13,7 +13,7 @@ from collections import defaultdict
 DATA_PATH = pkg_resources.resource_filename("lcge", "data/")
 
 
-# 生成数据集
+# 处理数据集，将实体、关系、时间戳映射到id，并创建相应的文件夹
 def prepare_dataset(path, name):
     """
     Given a path to a folder containing tab separated files :
@@ -24,7 +24,7 @@ def prepare_dataset(path, name):
     Also create to_skip_lhs / to_skip_rhs for filtered metrics and rel_id / ent_id for analysis.
     """
 
-    # 从文件中读取实体、关系、时间戳，并将其映射到集合中
+    # 从 src_data 中读取实体、关系、时间戳，并将其映射到集合中
     files = ["train", "valid", "test"]
     entities, relations, timestamps = set(), set(), set()
     for f in files:
@@ -51,8 +51,9 @@ def prepare_dataset(path, name):
     n_relations = len(relations)
     n_entities = len(entities)
 
+    # 创建 lcge 包中的文件夹
     os.makedirs(os.path.join(DATA_PATH, name))
-    # write ent to id / rel to id
+    # 把实体、关系、时间戳映射到id的字典写入文件，文件名分别为ent_id, rel_id, ts_id
     for dic, f in zip(
         [entities_to_id, relations_to_id, timestamps_to_id],
         ["ent_id", "rel_id", "ts_id"],
@@ -62,7 +63,7 @@ def prepare_dataset(path, name):
             ff.write("{}\t{}\n".format(x, i))
         ff.close()
 
-    # map train/test/valid with the ids
+    # 用 id 替换实体、关系、时间戳，并序列化到 lcge 包中
     for f in files:
         file_path = os.path.join(path, f)
         to_read = open(file_path, "r", encoding="utf-8")
@@ -86,7 +87,7 @@ def prepare_dataset(path, name):
 
     print("creating filtering lists")
 
-    # create filtering files
+    # 创建过滤列表，把对称的关系对应的实体对过滤掉，直接跳过
     to_skip = {"lhs": defaultdict(set), "rhs": defaultdict(set)}
     for f in files:
         examples = pickle.load(open(Path(DATA_PATH) / name / (f + ".pickle"), "rb"))
@@ -103,6 +104,7 @@ def prepare_dataset(path, name):
     pickle.dump(to_skip_final, out)
     out.close()
 
+    # 计算实体的概率，probas 是概率
     examples = pickle.load(open(Path(DATA_PATH) / name / "train.pickle", "rb"))
     counters = {
         "lhs": np.zeros(n_entities),
@@ -116,7 +118,7 @@ def prepare_dataset(path, name):
         counters["both"][lhs] += 1
         counters["both"][rhs] += 1
     for k, v in counters.items():
-        counters[k] = v / np.sum(v)
+        counters[k] = v / np.sum(v)  # 计算每个实体的概率
     out = open(Path(DATA_PATH) / name / "probas.pickle", "wb")
     pickle.dump(counters, out)
     out.close()
