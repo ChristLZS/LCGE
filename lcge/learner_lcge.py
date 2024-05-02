@@ -14,6 +14,7 @@ from regularizers_rule import N3, Lambda3
 from regularizers_rule import RuleSim
 import json
 
+# 例如 python learner_lcge.py --dataset ours --model LCGE --rank 2000 --emb_reg 0.005 --time_reg 0.01 --rule_reg 0.01 --max_epoch 1000 --weight_static 0.1 --learning_rate 0.1
 parser = argparse.ArgumentParser(
     description="Logic and Commonsense-Guided Temporal KGE"
 )

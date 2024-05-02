@@ -8,9 +8,8 @@ from models_cs import LCGE
 from regularizers import N3, Lambda3
 
 
+# 适用于 Wikidata12k
 # 设置了一系列的参数，可以在运行脚本时通过命令行来指定
-# 例如 python learner_lcge.py --dataset ICEWS14 --model LCGE --rank 2000 --emb_reg 0.005 --time_reg 0.01 --rule_reg 0.01 --max_epoch 1000 --weight_static 0.1 --learning_rate 0.1
-# 例如 python learner_lcge.py --dataset ours --model LCGE --rank 2000 --emb_reg 0.005 --time_reg 0.01 --rule_reg 0.01 --max_epoch 1000 --weight_static 0.1 --learning_rate 0.1
 parser = argparse.ArgumentParser(description="Commonsense-Guided Temporal KGE")
 parser.add_argument("--dataset", type=str, help="Dataset name")
 models = ["LCGE"]

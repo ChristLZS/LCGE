@@ -17,34 +17,39 @@ from models_lcge import TKBCModel
 DATA_PATH = pkg_resources.resource_filename("lcge", "data/")
 
 
+# 该类用于加载数据集
 class TemporalDataset(object):
+    # 初始化函数，传入数据集名称
     def __init__(self, name: str):
+        # 设置数据集的根目录
         self.root = Path(DATA_PATH) / name
 
+        # 读取数据集
         self.data = {}
         for f in ["train", "test", "valid"]:
             in_file = open(str(self.root / (f + ".pickle")), "rb")
             self.data[f] = pickle.load(in_file)
 
+        # 读取数据集的数量，加1是因为关系的索引从0开始
         maxis = np.max(self.data["train"], axis=0)
         self.n_entities = int(max(maxis[0], maxis[2]) + 1)
-        self.n_predicates = int(maxis[1] + 1)
-        self.n_predicates *= 2
+        self.n_predicates = int(maxis[1] + 1)  # 关系的数量
+        self.n_predicates *= 2  # 乘以2，因为每个关系都有一个逆关系
         if maxis.shape[0] > 4:
             self.n_timestamps = max(int(maxis[3] + 1), int(maxis[4] + 1))
         else:
             self.n_timestamps = int(maxis[3] + 1)
 
+        # 读取时间差，转换为张量
         try:
             inp_f = open(str(self.root / f"ts_diffs.pickle"), "rb")
             self.time_diffs = torch.from_numpy(pickle.load(inp_f)).cuda().float()
-            # print("Assume all timestamps are regularly spaced")
-            # self.time_diffs = None
             inp_f.close()
         except OSError:
             print("Assume all timestamps are regularly spaced")
             self.time_diffs = None
 
+        # 读取时间间隔和事件
         try:
             e = open(str(self.root / f"event_list_all.pickle"), "rb")
             self.events = pickle.load(e)
@@ -58,6 +63,7 @@ class TemporalDataset(object):
             print("Not using time intervals and events eval")
             self.events = None
 
+        # 加载需要跳过的索引
         if self.events is None:
             inp_f = open(str(self.root / f"to_skip.pickle"), "rb")
             self.to_skip: Dict[str, Dict[Tuple[int, int, int], List[int]]] = (
@@ -69,12 +75,16 @@ class TemporalDataset(object):
         # For any relation that has no beginning & no end:
         # add special beginning = end = no_timestamp, increase n_timestamps by one.
 
+    # 判断数据集是否有时间间隔，返回是否有事件
     def has_intervals(self):
         return self.events is not None
 
+    # 获取数据集，返回数据集
     def get_examples(self, split):
         return self.data[split]
 
+    # 获取训练数据，返回训练数据，将左右两边的实体和关系交换，关系加上关系数量的一半，即逆关系，返回交换后的数据
+    # 用于扩充训练数据
     def get_train(self):
         copy = np.copy(self.data["train"])
         tmp = np.copy(copy[:, 0])
@@ -83,6 +93,7 @@ class TemporalDataset(object):
         copy[:, 1] += self.n_predicates // 2  # has been multiplied by two.
         return np.vstack((self.data["train"], copy))
 
+    # 评估模型，返回MRR和hits@n
     def eval(
         self,
         model: TKBCModel,
@@ -91,6 +102,7 @@ class TemporalDataset(object):
         missing_eval: str = "both",
         at: Tuple[int] = (1, 3, 10),
     ):
+        # 如果数据集有时间间隔，则使用time_eval函数
         if self.events is not None:
             return self.time_eval(model, split, n_queries, "rhs", at)
         test = self.get_examples(split)
@@ -120,6 +132,7 @@ class TemporalDataset(object):
 
         return mean_reciprocal_rank, hits_at
 
+    # 获取时间评估，返回MRR和hits@n
     def time_eval(
         self,
         model: TKBCModel,
@@ -240,6 +253,7 @@ class TemporalDataset(object):
         res.update({("hits@_" + x): y for x, y in hits_at.items()})
         return res
 
+    # unused 函数
     def breakdown_time_eval(
         self,
         model: TKBCModel,
@@ -337,6 +351,7 @@ class TemporalDataset(object):
 
         return sum_reciprocal_rank
 
+    # unused 函数
     def time_AUC(self, model: TKBCModel, split: str, n_queries: int = -1):
         test = torch.from_numpy(self.get_examples(split).astype("int64"))
         if n_queries > 0:
@@ -350,5 +365,6 @@ class TemporalDataset(object):
             "macro": average_precision_score(truth, scores, average="macro"),
         }
 
+    # 获取数据集的形状，返回实体、关系、时间戳的数量
     def get_shape(self):
         return self.n_entities, self.n_predicates, self.n_entities, self.n_timestamps
