@@ -51,6 +51,7 @@ args = parser.parse_args()
 
 dataset = TemporalDataset(args.dataset)
 
+# 打开2个 json 文件和4个 txt 文件
 with open(
     "./src_data/rulelearning/" + args.dataset + "/rule1_p1.json", "r"
 ) as load_rule1_p1:
@@ -63,6 +64,7 @@ with open(
 f = open("./src_data/rulelearning/" + args.dataset + "/rule2_p1.txt", "r")
 rule2_p1 = {}
 for line in f:
+    # 包含头实体、两个尾实体和置信度
     head, body1, body2, confi = line.strip().split("\t")
     head, body1, body2, confi = int(head), int(body1), int(body2), float(confi)
     if head not in rule2_p1:
@@ -100,6 +102,7 @@ for line in f:
     rule2_p4[head][(body1, body2)] = confi
 f.close()
 
+# 6个规则
 rules = (rule1_p1, rule1_p2, rule2_p1, rule2_p2, rule2_p3, rule2_p4)
 
 sizes = dataset.get_shape()
